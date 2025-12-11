@@ -12,33 +12,18 @@ const logFormat = winston.format.combine(
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, '../logs');
 
-// Create logger
+// Create logger with console-only transport (file logging temporarily disabled due to Node.js filesystem issue)
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: logFormat,
   transports: [
-    // Write all logs with level 'error' and below to error.log
-    new winston.transports.File({
-      filename: path.join(logsDir, 'error.log'),
-      level: 'error',
-    }),
-    // Write all logs to combined.log
-    new winston.transports.File({
-      filename: path.join(logsDir, 'combined.log'),
-    }),
-  ],
-});
-
-// If not in production, log to console as well
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.simple()
       ),
     })
-  );
-}
+  ],
+});
 
 module.exports = logger;
