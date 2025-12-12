@@ -11,11 +11,14 @@ const logger = require('./utils/logger');
 // Load environment variables
 dotenv.config();
 
-// Connect to database
-connectDB();
-
 // Initialize express app
 const app = express();
+
+// Connect to database (non-blocking for serverless)
+connectDB().catch(err => {
+  logger.error('Initial MongoDB connection failed:', err);
+  console.error('MongoDB connection will retry on first request');
+});
 
 // Security middleware
 app.use(helmet());
@@ -53,6 +56,20 @@ if (process.env.NODE_ENV === 'development') {
     })
   );
 }
+
+// Ensure database connection before processing requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    logger.error('Database connection failed:', error);
+    res.status(503).json({
+      success: false,
+      message: 'Database connection unavailable. Please try again.',
+    });
+  }
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
