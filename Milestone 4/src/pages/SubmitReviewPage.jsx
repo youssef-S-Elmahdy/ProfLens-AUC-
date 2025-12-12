@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaChalkboardTeacher, FaBook, FaPaperPlane, FaCheckCircle, FaStar } from 'react-icons/fa';
+import { FaArrowLeft, FaPaperPlane, FaCheckCircle, FaStar } from 'react-icons/fa';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
 import Input from '../components/Input';
