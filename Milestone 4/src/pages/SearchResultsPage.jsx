@@ -8,6 +8,7 @@ const SearchResultsPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const searchQuery = searchParams.get('q') || '';
+  const department = searchParams.get('department') || '';
   const [professors, setProfessors] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,33 +17,38 @@ const SearchResultsPage = () => {
 
   useEffect(() => {
     const fetchSearchResults = async () => {
-      if (!searchQuery.trim()) {
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
 
-        // Search both professors and courses in parallel
-        const [professorsResponse, coursesResponse] = await Promise.all([
-          professorsAPI.search(searchQuery),
-          coursesAPI.search(searchQuery)
-        ]);
+        const hasQuery = searchQuery.trim().length > 0;
 
-        setProfessors(professorsResponse.data.data || []);
-        setCourses(coursesResponse.data.data || []);
+        const [professorsResponse, coursesResponse] = hasQuery
+          ? await Promise.all([
+              professorsAPI.search(searchQuery),
+              coursesAPI.search(searchQuery),
+            ])
+          : await Promise.all([
+              professorsAPI.getAll({ department, sortBy: 'overallRating', limit: 50 }),
+              coursesAPI.getAll({ department, sortBy: 'overallRating', limit: 50 }),
+            ]);
+
+        setProfessors(professorsResponse.data.data.professors || []);
+        setCourses(coursesResponse.data.data.courses || []);
       } catch (err) {
         console.error('Error fetching search results:', err);
-        setError('Failed to load search results. Please try again.');
+        const message =
+          err.code === 'ERR_NETWORK'
+            ? 'Cannot connect to the backend. Please ensure the API is running.'
+            : 'Failed to load search results. Please try again.';
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
 
     fetchSearchResults();
-  }, [searchQuery]);
+  }, [searchQuery, department]);
 
   const renderStars = (rating) => {
     return (
@@ -71,14 +77,14 @@ const SearchResultsPage = () => {
         </div>
         <div className="ml-4 flex-1">
           <h3 className="text-lg font-bold text-slate-900 group-hover:text-auc-blue-600 transition-colors">
-            {professor.name}
+            {professor.firstName} {professor.lastName}
           </h3>
-          <p className="text-sm text-slate-600">{professor.department}</p>
+          <p className="text-sm text-slate-600">{professor.departmentName || professor.department}</p>
         </div>
       </div>
-      {renderStars(professor.averageRating)}
+      {renderStars(professor.overallRating)}
       <div className="mt-4 text-sm text-slate-600">
-        <p>{professor.reviewCount || 0} reviews</p>
+        <p>{professor.totalReviews || 0} reviews</p>
       </div>
     </div>
   );
@@ -99,9 +105,9 @@ const SearchResultsPage = () => {
           <p className="text-sm text-slate-600">{course.name}</p>
         </div>
       </div>
-      {renderStars(course.averageRating)}
+      {renderStars(course.overallRating)}
       <div className="mt-4 text-sm text-slate-600">
-        <p>{course.reviewCount || 0} reviews</p>
+        <p>{course.totalReviews || 0} reviews</p>
       </div>
     </div>
   );

@@ -12,6 +12,9 @@ const HomePage = () => {
   const [topProfessors, setTopProfessors] = useState([]);
   const [topCourses, setTopCourses] = useState([]);
   const [recentlyReviewed, setRecentlyReviewed] = useState([]);
+  const [professorCount, setProfessorCount] = useState(0);
+  const [courseCount, setCourseCount] = useState(0);
+  const [departmentCounts, setDepartmentCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -20,23 +23,39 @@ const HomePage = () => {
       try {
         setLoading(true);
 
-        // Fetch top professors and courses in parallel
+        // Fetch lists (larger limit) to derive counts and top items
         const [professorsResponse, coursesResponse] = await Promise.all([
-          professorsAPI.getAll({ sortBy: 'overallRating', limit: 4 }),
-          coursesAPI.getAll({ sortBy: 'overallRating', limit: 4 })
+          professorsAPI.getAll({ sortBy: 'overallRating', limit: 200 }),
+          coursesAPI.getAll({ sortBy: 'overallRating', limit: 200 })
         ]);
 
-        setTopProfessors(professorsResponse.data.data.professors || []);
-        setTopCourses(coursesResponse.data.data.courses || []);
+        const profList = professorsResponse.data.data.professors || [];
+        const courseList = coursesResponse.data.data.courses || [];
+
+        setProfessorCount(professorsResponse.data.total || profList.length);
+        setCourseCount(coursesResponse.data.total || courseList.length);
+
+        // Department counts
+        const deptCounts = {};
+        profList.forEach((prof) => {
+          const key = (prof.department || '').toLowerCase() || (prof.departmentName || '').toLowerCase() || 'other';
+          deptCounts[key] = (deptCounts[key] || 0) + 1;
+        });
+        setDepartmentCounts(deptCounts);
+
+        setTopProfessors(profList.slice(0, 4));
+        setTopCourses(courseList.slice(0, 4));
 
         // Set recently reviewed (just use first 3 professors for now)
-        setRecentlyReviewed((professorsResponse.data.data.professors || []).slice(0, 3));
+        setRecentlyReviewed(profList.slice(0, 3));
       } catch (error) {
         console.error('Error fetching home data:', error);
         // If error, use empty arrays - user is still logged in
         setTopProfessors([]);
         setTopCourses([]);
         setRecentlyReviewed([]);
+        setProfessorCount(0);
+        setCourseCount(0);
       } finally {
         setLoading(false);
       }
@@ -84,11 +103,15 @@ const HomePage = () => {
             {/* Quick Stats */}
             <div className="mt-14 grid grid-cols-3 gap-6 max-w-xl mx-auto">
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5">
-                <p className="text-4xl font-bold text-auc-gold-500">150+</p>
+                <p className="text-4xl font-bold text-auc-gold-500">
+                  {professorCount ? `${professorCount}+` : '—'}
+                </p>
                 <p className="text-base text-auc-blue-200">Professors</p>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5">
-                <p className="text-4xl font-bold text-auc-gold-500">500+</p>
+                <p className="text-4xl font-bold text-auc-gold-500">
+                  {courseCount ? `${courseCount}+` : '—'}
+                </p>
                 <p className="text-base text-auc-blue-200">Courses</p>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5">
@@ -189,14 +212,14 @@ const HomePage = () => {
           <h2 className="text-3xl font-bold text-slate-900 mb-8">Browse by Department</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
             {[
-              { name: 'Computer Science', code: 'CSCE', count: 45 },
-              { name: 'Business Administration', code: 'BUSN', count: 38 },
-              { name: 'Engineering', code: 'ENGR', count: 52 },
-              { name: 'Mathematics', code: 'MACT', count: 28 },
-              { name: 'Economics', code: 'ECON', count: 32 },
-              { name: 'Physics', code: 'PHYS', count: 24 },
-              { name: 'Rhetoric', code: 'RHET', count: 18 },
-              { name: 'Arabic Studies', code: 'ARIC', count: 22 },
+              { name: 'Computer Science', code: 'csce' },
+              { name: 'Business Administration', code: 'busn' },
+              { name: 'Engineering', code: 'engr' },
+              { name: 'Mathematics', code: 'mact' },
+              { name: 'Economics', code: 'econ' },
+              { name: 'Physics', code: 'phys' },
+              { name: 'Rhetoric', code: 'rhet' },
+              { name: 'Arabic Studies', code: 'aric' },
             ].map((dept) => (
               <Link
                 key={dept.code}
@@ -206,7 +229,9 @@ const HomePage = () => {
                 <h3 className="font-semibold text-lg text-slate-900 group-hover:text-auc-blue-600 transition-colors">
                   {dept.name}
                 </h3>
-                <p className="text-base text-slate-500 mt-1">{dept.count} professors</p>
+                <p className="text-base text-slate-500 mt-1">
+                  {(departmentCounts[dept.code] || 0)} professors
+                </p>
               </Link>
             ))}
           </div>

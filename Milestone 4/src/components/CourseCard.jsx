@@ -4,6 +4,10 @@ import { FaBook, FaComments, FaGraduationCap } from 'react-icons/fa';
 import { StarRatingDisplay } from './StarRating';
 
 const CourseCard = ({ course }) => {
+  const reviewCount =
+    (course.reviews && course.reviews.length) ||
+    course.totalReviews ||
+    0;
   // Calculate difficulty display
   const getDifficultyLabel = (difficulty) => {
     if (difficulty <= 2) return { label: 'Easy', color: 'text-green-600 bg-green-50' };
@@ -54,7 +58,7 @@ const CourseCard = ({ course }) => {
           <StarRatingDisplay rating={course.overallRating} size="md" />
           <div className="flex items-center text-slate-500 text-base">
             <FaComments className="mr-2" />
-            <span>{course.totalReviews} reviews</span>
+            <span>{reviewCount} reviews</span>
           </div>
         </div>
 

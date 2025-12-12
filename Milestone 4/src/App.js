@@ -10,6 +10,7 @@ import ProfessorReviewPage from './pages/ProfessorReviewPage';
 import CourseReviewPage from './pages/CourseReviewPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import SubmitReviewPage from './pages/SubmitReviewPage';
+import AccountPage from './pages/AccountPage';
 
 function App() {
   return (
@@ -55,6 +56,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SubmitReviewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account"
+            element={
+              <ProtectedRoute>
+                <AccountPage />
               </ProtectedRoute>
             }
           />

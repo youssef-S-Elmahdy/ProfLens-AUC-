@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
         try {
           // Verify token is still valid
           const response = await authAPI.getMe();
-          setUser(response.data.data);
+          setUser(response.data.data.user);
           setIsAuthenticated(true);
         } catch (error) {
           // Token invalid, clear storage
@@ -75,15 +75,16 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       const response = await authAPI.register(userData);
-      const { token, user: newUser } = response.data.data;
+      // Do not auto-login after registration; require explicit login
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+      setIsAuthenticated(false);
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(newUser));
-
-      setUser(newUser);
-      setIsAuthenticated(true);
-
-      return { success: true };
+      return {
+        success: true,
+        message: response.data?.message || 'Account created successfully. Please log in.',
+      };
     } catch (error) {
       console.error('Registration error:', error);
       let message = 'Registration failed. Please try again.';

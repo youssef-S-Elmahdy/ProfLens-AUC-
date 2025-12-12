@@ -1,24 +1,40 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaSearch, FaBars, FaTimes, FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
-import { searchAll } from '../data/mockData';
+import { professorsAPI, coursesAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState({ professors: [], courses: [] });
   const [showResults, setShowResults] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
 
-  const handleSearchChange = (e) => {
+  const handleSearchChange = async (e) => {
     const query = e.target.value;
     setSearchQuery(query);
 
     if (query.trim().length >= 2) {
-      const results = searchAll(query);
-      setSearchResults(results);
-      setShowResults(true);
+      try {
+        const [profResponse, courseResponse] = await Promise.all([
+          professorsAPI.search(query.trim()),
+          coursesAPI.search(query.trim()),
+        ]);
+
+        setSearchResults({
+          professors: profResponse.data.data.professors || [],
+          courses: courseResponse.data.data.courses || [],
+        });
+        setShowResults(true);
+      } catch (err) {
+        console.error('Search failed:', err);
+        setSearchResults({ professors: [], courses: [] });
+        setShowResults(false);
+      }
     } else {
       setSearchResults({ professors: [], courses: [] });
       setShowResults(false);
@@ -41,7 +57,13 @@ const Navbar = () => {
   };
 
   const handleLogout = () => {
+    logout();
     navigate('/');
+  };
+
+  const handleAccount = () => {
+    setShowUserMenu(false);
+    navigate('/account');
   };
 
   const isActive = (path) => location.pathname === path;
@@ -85,8 +107,8 @@ const Navbar = () => {
                     <h4 className="text-sm font-semibold text-slate-500 uppercase px-3 py-1">Professors</h4>
                     {searchResults.professors.slice(0, 3).map(prof => (
                       <button
-                        key={prof.id}
-                        onClick={() => handleResultClick('professor', prof.id)}
+                        key={prof._id}
+                        onClick={() => handleResultClick('professor', prof._id)}
                         className="w-full text-left px-3 py-3 hover:bg-slate-100 rounded-md flex items-center space-x-3"
                       >
                         <div className="w-10 h-10 bg-auc-blue-100 rounded-full flex items-center justify-center">
@@ -107,8 +129,8 @@ const Navbar = () => {
                     <h4 className="text-sm font-semibold text-slate-500 uppercase px-3 py-1">Courses</h4>
                     {searchResults.courses.slice(0, 3).map(course => (
                       <button
-                        key={course.id}
-                        onClick={() => handleResultClick('course', course.id)}
+                        key={course._id}
+                        onClick={() => handleResultClick('course', course._id)}
                         className="w-full text-left px-3 py-3 hover:bg-slate-100 rounded-md"
                       >
                         <p className="text-base font-medium text-slate-900">{course.code}</p>
@@ -152,14 +174,35 @@ const Navbar = () => {
               Browse
             </Link>
             <div className="flex items-center space-x-3 ml-5 pl-5 border-l border-auc-blue-700">
-              <FaUserCircle className="text-slate-300 text-2xl" />
-              <button
-                onClick={handleLogout}
-                className="text-slate-300 hover:text-white transition-colors text-xl"
-                title="Logout"
-              >
-                <FaSignOutAlt />
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowUserMenu((prev) => !prev)}
+                  className="flex items-center text-slate-300 hover:text-white transition-colors text-xl"
+                  title="Account menu"
+                >
+                  <FaUserCircle />
+                </button>
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg border border-slate-200 z-50">
+                    <button
+                      type="button"
+                      onClick={handleAccount}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-t-md"
+                    >
+                      Account
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-b-md flex items-center space-x-2"
+                    >
+                      <FaSignOutAlt />
+                      <span>Sign out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

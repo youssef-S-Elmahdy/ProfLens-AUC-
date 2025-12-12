@@ -1,6 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { FaChalkboardTeacher, FaStar, FaThumbsUp, FaPlus, FaArrowLeft } from 'react-icons/fa';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import {
+  FaChalkboardTeacher,
+  FaStar,
+  FaThumbsUp,
+  FaPlus,
+  FaArrowLeft,
+  FaEnvelope,
+  FaBookOpen,
+} from 'react-icons/fa';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
 import { professorsAPI, reviewsAPI } from '../services/api';
@@ -12,6 +20,9 @@ const ProfessorReviewPage = () => {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [filterSemester, setFilterSemester] = useState('all');
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -25,11 +36,16 @@ const ProfessorReviewPage = () => {
           reviewsAPI.getAll({ type: 'professor', professorId: id })
         ]);
 
-        setProfessor(professorResponse.data.data);
-        setReviews(reviewsResponse.data.data.reviews || []);
+        setProfessor(professorResponse.data.data.professor);
+        const fetchedReviews = reviewsResponse.data.data.reviews || [];
+        setReviews(fetchedReviews);
       } catch (err) {
         console.error('Error fetching professor data:', err);
-        setError(err.response?.data?.message || 'Failed to load professor data.');
+        const message =
+          err.code === 'ERR_NETWORK'
+            ? 'Cannot connect to the backend. Please ensure the API is running.'
+            : err.response?.data?.message || 'Failed to load professor data.';
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -40,99 +56,115 @@ const ProfessorReviewPage = () => {
 
   const handleMarkHelpful = async (reviewId) => {
     try {
-      await reviewsAPI.markHelpful(reviewId);
-      // Update the review in the local state
-      setReviews(reviews.map(review =>
-        review._id === reviewId
-          ? { ...review, helpfulCount: (review.helpfulCount || 0) + 1 }
-          : review
-      ));
+      const response = await reviewsAPI.markHelpful(reviewId);
+      const updatedHelpful = response.data?.data?.helpful;
+      setReviews(
+        reviews.map((review) =>
+          review._id === reviewId
+            ? { ...review, helpful: updatedHelpful ?? (review.helpful || 0) + 1 }
+            : review
+        )
+      );
     } catch (err) {
       console.error('Error marking review as helpful:', err);
     }
   };
 
-  const renderStars = (rating) => {
-    return (
-      <div className="flex items-center">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <FaStar
-            key={star}
-            className={`${
-              star <= Math.round(rating) ? 'text-auc-gold-500' : 'text-slate-300'
-            } text-lg`}
-          />
-        ))}
-        <span className="ml-2 text-lg font-bold text-slate-700">{rating?.toFixed(1) || 'N/A'}</span>
-      </div>
-    );
+  const handleReport = async (reviewId) => {
+    try {
+      await reviewsAPI.report(reviewId);
+      setError(null);
+      setSuccessMessage('Review reported. Thank you.');
+    } catch (err) {
+      console.error('Error reporting review:', err);
+      setError('Failed to report review. Please try again.');
+    }
   };
 
+  const renderStars = (rating, size = 'text-lg') => (
+    <div className="flex items-center">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <FaStar
+          key={star}
+          className={`${star <= Math.round(rating) ? 'text-auc-gold-500' : 'text-slate-300'} ${size}`}
+        />
+      ))}
+    </div>
+  );
+
+  const ratingBreakdown = useMemo(() => {
+    const ratings = professor?.ratings || {};
+    return [
+      { label: 'Clarity', key: 'clarity' },
+      { label: 'Helpfulness', key: 'helpfulness' },
+      { label: 'Engagement', key: 'engagement' },
+      { label: 'Grading Fairness', key: 'grading' },
+      { label: 'Workload', key: 'workload' },
+      { label: 'Communication', key: 'communication' },
+    ].map((item) => ({
+      ...item,
+      value: ratings[item.key] || 0,
+    }));
+  }, [professor]);
+
+  const reviewCount = reviews.length;
+
   const ReviewCard = ({ review }) => (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-4">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <div className="flex items-center mb-2">
-            {renderStars(review.rating)}
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 mb-5">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <div className="flex items-center space-x-3">
+            {renderStars(review.rating, 'text-sm')}
+            <span className="text-sm font-semibold text-slate-800">{review.rating.toFixed(1)}/5</span>
           </div>
-          <p className="text-sm text-slate-600">
-            {review.semester} {review.year} • {review.anonymous ? 'Anonymous' : review.author?.firstName + ' ' + review.author?.lastName}
+          <p className="text-xs text-slate-500 mt-1">
+            {review.anonymous
+              ? 'Anonymous Student'
+              : review.user
+              ? `${review.user.firstName} ${review.user.lastName}`
+              : 'Student'}{' '}
+            • {review.semester || 'N/A'} • {new Date(review.createdAt).toLocaleDateString()}
           </p>
         </div>
+        <button
+          onClick={() => handleMarkHelpful(review._id)}
+          className="flex items-center space-x-2 text-slate-500 hover:text-auc-blue-600 text-sm"
+        >
+          <FaThumbsUp />
+          <span>Helpful ({review.helpful || 0})</span>
+        </button>
       </div>
 
-      <div className="space-y-3">
-        {review.comment && (
-          <div>
-            <h4 className="text-sm font-semibold text-slate-700 mb-1">Review</h4>
-            <p className="text-slate-700">{review.comment}</p>
-          </div>
-        )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-slate-600 mb-3">
+        <div>Clarity: {review.clarity ? `${review.clarity}/5` : 'N/A'}</div>
+        <div>Helpfulness: {review.helpfulness ? `${review.helpfulness}/5` : 'N/A'}</div>
+        <div>Engagement: {review.engagement ? `${review.engagement}/5` : 'N/A'}</div>
+        <div>Grading: {review.grading ? `${review.grading}/5` : 'N/A'}</div>
+        <div>Workload: {review.workload ? `${review.workload}/5` : 'N/A'}</div>
+        <div>Communication: {review.communication ? `${review.communication}/5` : 'N/A'}</div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-200">
-          <div>
-            <p className="text-xs text-slate-500 uppercase">Difficulty</p>
-            <p className="text-sm font-medium text-slate-900">{review.difficulty}/5</p>
-          </div>
-          {review.grading && (
-            <div>
-              <p className="text-xs text-slate-500 uppercase">Grading</p>
-              <p className="text-sm font-medium text-slate-900">{review.grading}</p>
-            </div>
-          )}
-          {review.attendance && (
-            <div>
-              <p className="text-xs text-slate-500 uppercase">Attendance</p>
-              <p className="text-sm font-medium text-slate-900">{review.attendance}</p>
-            </div>
-          )}
+      {review.comment && <p className="text-slate-700 leading-relaxed">{review.comment}</p>}
+
+      {review.tags && review.tags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {review.tags.map((tag, idx) => (
+            <span
+              key={idx}
+              className="px-3 py-1 bg-auc-blue-50 text-auc-blue-700 text-xs font-medium rounded-full"
+            >
+              {tag}
+            </span>
+          ))}
         </div>
-
-        {review.tags && review.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-2">
-            {review.tags.map((tag, idx) => (
-              <span
-                key={idx}
-                className="px-3 py-1 bg-auc-blue-50 text-auc-blue-700 text-xs font-medium rounded-full"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-          <button
-            onClick={() => handleMarkHelpful(review._id)}
-            className="flex items-center space-x-2 text-slate-600 hover:text-auc-blue-600 transition-colors"
-          >
-            <FaThumbsUp />
-            <span className="text-sm">Helpful ({review.helpfulCount || 0})</span>
-          </button>
-          <p className="text-xs text-slate-400">
-            {new Date(review.createdAt).toLocaleDateString()}
-          </p>
-        </div>
+      )}
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={() => handleReport(review._id)}
+          className="text-xs text-slate-500 hover:text-auc-blue-600"
+        >
+          Report
+        </button>
       </div>
     </div>
   );
@@ -171,61 +203,189 @@ const ProfessorReviewPage = () => {
     <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Back Button */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <button
           onClick={() => navigate('/home')}
-          className="flex items-center space-x-2 text-auc-blue-600 hover:text-auc-blue-700 mb-6"
+          className="flex items-center space-x-2 text-auc-blue-600 hover:text-auc-blue-700 mb-4 text-sm"
         >
           <FaArrowLeft />
           <span>Back to Home</span>
         </button>
 
-        {/* Professor Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center">
-              <div className="bg-auc-blue-100 p-4 rounded-full">
-                <FaChalkboardTeacher className="text-auc-blue-600 text-4xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left column: profile card */}
+          <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-6 lg:col-span-1">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-20 h-20 rounded-full bg-auc-blue-100 flex items-center justify-center text-auc-blue-700 text-2xl font-bold">
+                {professor?.firstName?.[0]}
+                {professor?.lastName?.[0]}
               </div>
-              <div className="ml-6">
-                <h1 className="text-3xl font-bold text-slate-900 mb-2">
-                  {professor?.name}
-                </h1>
-                <p className="text-lg text-slate-600 mb-4">{professor?.department}</p>
-                {renderStars(professor?.averageRating || 0)}
-                <p className="text-sm text-slate-600 mt-2">
-                  Based on {reviews.length} reviews
-                </p>
+              <h1 className="mt-4 text-xl font-bold text-slate-900">
+                {professor ? `${professor.firstName} ${professor.lastName}` : ''}
+              </h1>
+              <p className="text-slate-600">{professor?.title || 'Professor'}</p>
+              <p className="text-sm text-slate-500">
+                {professor?.departmentName || professor?.department}
+              </p>
+
+              <div className="mt-4 flex flex-col items-center">
+                <div className="flex items-center space-x-2">
+                  {renderStars(professor?.overallRating || 0)}
+                  <span className="text-lg font-semibold text-slate-800">
+                    {professor?.overallRating?.toFixed(1) || 'N/A'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                {reviewCount} reviews
+              </p>
+            </div>
+            </div>
+
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-slate-700 mb-3">Rating Breakdown</h3>
+              <div className="space-y-3">
+                {ratingBreakdown.map((item) => (
+                  <div key={item.key}>
+                    <div className="flex justify-between text-xs text-slate-600 mb-1">
+                      <span>{item.label}</span>
+                      <span>{item.value.toFixed(1)}/5</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-auc-blue-600"
+                        style={{ width: `${(item.value / 5) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
+
+            {professor?.tags?.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">Common Tags</h3>
+                <div className="flex flex-wrap gap-2">
+                  {professor.tags.slice(0, 8).map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-3 py-1 bg-slate-100 text-slate-700 text-xs rounded-full"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {professor?.courses?.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center space-x-2">
+                  <FaBookOpen />
+                  <span>Courses Taught</span>
+                </h3>
+                <div className="space-y-2 text-sm text-slate-700">
+                  {professor.courses.map((course) => (
+                    <div key={course} className="px-3 py-2 bg-slate-50 rounded-md border border-slate-100">
+                      {course}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {professor?.email && (
+              <div className="mt-6 flex items-center text-sm text-slate-600">
+                <FaEnvelope className="mr-2 text-slate-500" />
+                <a
+                  href={`mailto:${professor.email}`}
+                  className="text-auc-blue-600 hover:text-auc-blue-700"
+                >
+                  {professor.email}
+                </a>
+              </div>
+            )}
+
             <Button
               onClick={() => navigate(`/submit-review/professor/${id}`)}
               variant="primary"
-              className="flex items-center space-x-2"
+              className="mt-6 w-full flex items-center justify-center space-x-2"
             >
               <FaPlus />
-              <span>Add Review</span>
+              <span>Write a Review</span>
             </Button>
           </div>
-        </div>
 
-        {/* Reviews Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">Student Reviews</h2>
-          {reviews.length > 0 ? (
-            reviews.map((review) => <ReviewCard key={review._id} review={review} />)
-          ) : (
-            <div className="bg-white rounded-lg p-8 text-center">
-              <p className="text-slate-600 mb-4">No reviews yet for this professor.</p>
-              <Button
-                onClick={() => navigate(`/submit-review/professor/${id}`)}
-                variant="primary"
-              >
-                Be the first to review
-              </Button>
+          {/* Right column: reviews */}
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  Student Reviews ({reviewCount})
+                </h2>
+                {successMessage && (
+                  <div className="mt-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded px-3 py-2">
+                    {successMessage}
+                  </div>
+                )}
+                {error && (
+                  <div className="mt-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2">
+                    {error}
+                  </div>
+                )}
+                <div className="flex items-center space-x-3 mt-2 text-sm text-slate-600">
+                  <label>
+                    Sort:
+                    <select
+                      value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="ml-2 border border-slate-300 rounded px-2 py-1 text-sm"
+                  >
+                    <option value="createdAt">Most Recent</option>
+                    <option value="rating">Highest Rating</option>
+                  </select>
+                </label>
+                <label>
+                  Semester:
+                  <select
+                    value={filterSemester}
+                    onChange={(e) => setFilterSemester(e.target.value)}
+                    className="ml-2 border border-slate-300 rounded px-2 py-1 text-sm"
+                  >
+                    <option value="all">All</option>
+                    <option value="Fall">Fall</option>
+                    <option value="Spring">Spring</option>
+                    <option value="Summer">Summer</option>
+                  </select>
+                </label>
+              </div>
             </div>
-          )}
+            <Link
+              to={`/submit-review/professor/${id}`}
+              className="text-auc-blue-600 hover:text-auc-blue-700 text-sm font-semibold"
+            >
+              Add your review
+            </Link>
+          </div>
+
+            {reviews.length > 0 ? (
+              reviews
+                .filter((r) =>
+                  filterSemester === 'all'
+                    ? true
+                    : (r.semester || '').toLowerCase().includes(filterSemester.toLowerCase())
+                )
+                .sort((a, b) =>
+                  sortBy === 'rating'
+                    ? b.rating - a.rating
+                    : new Date(b.createdAt) - new Date(a.createdAt)
+                )
+                .map((review) => <ReviewCard key={review._id} review={review} />)
+            ) : (
+              <div className="bg-white rounded-xl border border-slate-100 p-6 text-center text-slate-600">
+                No reviews yet for this professor. Be the first to share your experience.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -306,3 +306,28 @@ exports.markHelpful = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Report review
+// @route   PUT /api/reviews/:id/report
+// @access  Private
+exports.reportReview = async (req, res, next) => {
+  try {
+    const review = await Review.findById(req.params.id);
+
+    if (!review) {
+      return next(new AppError('Review not found', 404));
+    }
+
+    review.reported = true;
+    review.reportCount = (review.reportCount || 0) + 1;
+    await review.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Review reported. Our team will review it shortly.',
+      data: { reportCount: review.reportCount },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

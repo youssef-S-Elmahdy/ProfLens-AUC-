@@ -127,12 +127,22 @@ const LoginPage = () => {
       }
 
       if (result.success) {
-        setSuccessMessage(isLogin ? 'Login successful! Redirecting...' : 'Account created successfully! Redirecting...');
-        setTimeout(() => {
-          navigate('/home');
-        }, 1000);
+        if (isLogin) {
+          setSuccessMessage('Login successful! Redirecting...');
+          setTimeout(() => {
+            navigate('/home');
+          }, 800);
+        } else {
+          setSuccessMessage(result.message || 'Account created successfully! Please log in.');
+          setIsLogin(true);
+          setFormData((prev) => ({
+            ...prev,
+            password: '',
+            confirmPassword: '',
+          }));
+        }
       } else {
-        setServerError(result.message || 'An error occurred. Please try again.');
+        setServerError(result.message || 'Incorrect email or password. Please try again.');
       }
     } catch (error) {
       console.error('Auth error:', error);
@@ -147,6 +157,11 @@ const LoginPage = () => {
     setErrors({});
     setServerError('');
     setSuccessMessage('');
+    setFormData((prev) => ({
+      ...prev,
+      password: '',
+      confirmPassword: '',
+    }));
   };
 
   return (

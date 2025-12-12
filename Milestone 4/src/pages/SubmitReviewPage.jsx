@@ -19,11 +19,19 @@ const SubmitReviewPage = () => {
   // Common form state
   const [formData, setFormData] = useState({
     rating: 0,
-    difficulty: 0,
+    difficulty: 0, // course difficulty or professor workload proxy (legacy)
+    clarity: 0,
+    helpfulness: 0,
+    engagement: 0,
+    grading: 0,
+    workload: 0,
+    communication: 0,
+    usefulness: 0,
+    contentQuality: 0,
     comment: '',
     semester: 'Fall',
     year: new Date().getFullYear(),
-    tags: [],
+    courseTaken: '',
     anonymous: false,
   });
 
@@ -37,10 +45,14 @@ const SubmitReviewPage = () => {
         } else {
           response = await coursesAPI.getById(id);
         }
-        setTarget(response.data.data);
+        setTarget(type === 'professor' ? response.data.data.professor : response.data.data.course);
       } catch (err) {
         console.error('Error fetching target:', err);
-        setError('Failed to load data.');
+        const message =
+          err.code === 'ERR_NETWORK'
+            ? 'Cannot connect to the backend. Please ensure the API is running.'
+            : err.response?.data?.message || 'Failed to load data.';
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -73,13 +85,21 @@ const SubmitReviewPage = () => {
     if (formData.rating === 0) {
       newErrors.rating = 'Please provide a rating';
     }
-    if (formData.difficulty === 0) {
-      newErrors.difficulty = 'Please rate the difficulty';
+    if (type === 'course') {
+      if (formData.difficulty === 0) newErrors.difficulty = 'Please rate the difficulty';
+      if (formData.workload === 0) newErrors.workload = 'Please rate the workload';
+      if (formData.usefulness === 0) newErrors.usefulness = 'Please rate the usefulness';
+      if (formData.contentQuality === 0) newErrors.contentQuality = 'Please rate the content quality';
+    } else {
+      if (formData.clarity === 0) newErrors.clarity = 'Please rate clarity';
+      if (formData.helpfulness === 0) newErrors.helpfulness = 'Please rate helpfulness';
+      if (formData.engagement === 0) newErrors.engagement = 'Please rate engagement';
+      if (formData.grading === 0) newErrors.grading = 'Please rate grading fairness';
+      if (formData.workload === 0) newErrors.workload = 'Please rate workload';
+      if (formData.communication === 0) newErrors.communication = 'Please rate communication';
     }
     if (!formData.comment.trim()) {
       newErrors.comment = 'Please write a review';
-    } else if (formData.comment.trim().length < 50) {
-      newErrors.comment = 'Review must be at least 50 characters';
     }
 
     setErrors(newErrors);
@@ -98,13 +118,27 @@ const SubmitReviewPage = () => {
       const reviewData = {
         type,
         rating: formData.rating,
-        difficulty: formData.difficulty,
         comment: formData.comment,
-        semester: formData.semester,
-        year: parseInt(formData.year),
-        tags: formData.tags,
+        semester: `${formData.semester} ${formData.year}`,
         anonymous: formData.anonymous,
       };
+
+      if (type === 'professor') {
+        reviewData.clarity = formData.clarity;
+        reviewData.helpfulness = formData.helpfulness;
+        reviewData.engagement = formData.engagement;
+        reviewData.grading = formData.grading;
+        reviewData.workload = formData.workload;
+        reviewData.communication = formData.communication;
+        if (formData.courseTaken) {
+          reviewData.courseTaken = formData.courseTaken;
+        }
+      } else {
+        reviewData.difficulty = formData.difficulty;
+        reviewData.workload = formData.workload;
+        reviewData.usefulness = formData.usefulness;
+        reviewData.contentQuality = formData.contentQuality;
+      }
 
       // Only add numeric fields if they have values
       // Remove grading and attendance for now (they're optional and causing validation errors)
@@ -217,112 +251,198 @@ const SubmitReviewPage = () => {
     <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <button
           onClick={() => navigate(`/${type}/${id}`)}
-          className="flex items-center space-x-2 text-auc-blue-600 hover:text-auc-blue-700 mb-6"
+          className="flex items-center space-x-2 text-auc-blue-600 hover:text-auc-blue-700 mb-6 text-sm"
         >
           <FaArrowLeft />
           <span>Back to {type === 'professor' ? 'Professor' : 'Course'}</span>
         </button>
 
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-          <div className="flex items-center">
-            <div className={`p-4 rounded-full ${type === 'professor' ? 'bg-auc-blue-100' : 'bg-auc-gold-100'}`}>
-              {type === 'professor' ? (
-                <FaChalkboardTeacher className="text-auc-blue-600 text-3xl" />
-              ) : (
-                <FaBook className="text-auc-gold-600 text-3xl" />
-              )}
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-auc-blue-900 to-auc-blue-700 px-6 py-5 text-white flex items-center">
+            <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center text-xl font-bold uppercase">
+              {type === 'professor'
+                ? `${target?.firstName?.[0] || ''}${target?.lastName?.[0] || ''}`
+                : (target?.code || 'C')[0]}
             </div>
-            <div className="ml-6">
-              <h1 className="text-2xl font-bold text-slate-900">
-                Submit Review for {target?.name || target?.code}
+            <div className="ml-4">
+              <p className="text-sm text-auc-blue-200 mb-1">
+                {type === 'professor' ? 'Review Professor' : 'Review Course'}
+              </p>
+              <h1 className="text-lg font-semibold">
+                {type === 'professor'
+                  ? `${target?.firstName || ''} ${target?.lastName || ''}`.trim()
+                  : target?.name || target?.code}
               </h1>
-              <p className="text-slate-600">
-                {type === 'professor' ? target?.department : target?.name}
+              <p className="text-xs text-auc-blue-200">
+                {type === 'professor'
+                  ? target?.departmentName || target?.department
+                  : target?.departmentName}
               </p>
             </div>
           </div>
-        </div>
 
-        {/* Review Form */}
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600">{error}</p>
-            </div>
-          )}
+          <div className="p-8">
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-600">{error}</p>
+              </div>
+            )}
 
-          <form onSubmit={handleSubmit}>
-            <StarRating
-              value={formData.rating}
-              onChange={(value) => handleRatingChange('rating', value)}
-              label="Overall Rating"
-              error={errors.rating}
-            />
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {type === 'professor' && target?.courses?.length > 0 && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Which course did you take with this professor?
+                  </label>
+                  <select
+                    name="courseTaken"
+                    value={formData.courseTaken}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-auc-blue-500"
+                  >
+                    <option value="">Select a course...</option>
+                    {target.courses.map((courseCode) => (
+                      <option key={courseCode} value={courseCode}>
+                        {courseCode}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-            <StarRating
-              value={formData.difficulty}
-              onChange={(value) => handleRatingChange('difficulty', value)}
-              label="Difficulty"
-              error={errors.difficulty}
-            />
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <StarRating
+                  value={formData.rating}
+                  onChange={(value) => handleRatingChange('rating', value)}
+                  label="Overall Rating"
+                  error={errors.rating}
+                />
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">Rate specific aspects</h3>
+                {type === 'course' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <StarRating
+                      value={formData.difficulty}
+                      onChange={(value) => handleRatingChange('difficulty', value)}
+                      label="Difficulty"
+                      error={errors.difficulty}
+                    />
+                    <StarRating
+                      value={formData.workload}
+                      onChange={(value) => handleRatingChange('workload', value)}
+                      label="Workload"
+                      error={errors.workload}
+                    />
+                    <StarRating
+                      value={formData.usefulness}
+                      onChange={(value) => handleRatingChange('usefulness', value)}
+                      label="Usefulness"
+                      error={errors.usefulness}
+                    />
+                    <StarRating
+                      value={formData.contentQuality}
+                      onChange={(value) => handleRatingChange('contentQuality', value)}
+                      label="Content Quality"
+                      error={errors.contentQuality}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <StarRating
+                      value={formData.clarity}
+                      onChange={(value) => handleRatingChange('clarity', value)}
+                      label="Clarity of Teaching"
+                      error={errors.clarity}
+                    />
+                    <StarRating
+                      value={formData.helpfulness}
+                      onChange={(value) => handleRatingChange('helpfulness', value)}
+                      label="Helpfulness"
+                      error={errors.helpfulness}
+                    />
+                    <StarRating
+                      value={formData.engagement}
+                      onChange={(value) => handleRatingChange('engagement', value)}
+                      label="Engagement"
+                      error={errors.engagement}
+                    />
+                    <StarRating
+                      value={formData.grading}
+                      onChange={(value) => handleRatingChange('grading', value)}
+                      label="Grading Fairness"
+                      error={errors.grading}
+                    />
+                    <StarRating
+                      value={formData.workload}
+                      onChange={(value) => handleRatingChange('workload', value)}
+                      label="Workload"
+                      error={errors.workload}
+                    />
+                    <StarRating
+                      value={formData.communication}
+                      onChange={(value) => handleRatingChange('communication', value)}
+                      label="Communication"
+                      error={errors.communication}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Semester
+                  </label>
+                  <select
+                    name="semester"
+                    value={formData.semester}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-auc-blue-500"
+                  >
+                    <option value="Fall">Fall</option>
+                    <option value="Spring">Spring</option>
+                    <option value="Summer">Summer</option>
+                  </select>
+                </div>
+                <Input
+                  type="number"
+                  name="year"
+                  label="Year"
+                  value={formData.year}
+                  onChange={handleInputChange}
+                  min="2020"
+                  max={new Date().getFullYear()}
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Semester
+                  Your Review <span className="text-red-500">*</span>
                 </label>
-                <select
-                  name="semester"
-                  value={formData.semester}
+                <textarea
+                  name="comment"
+                  value={formData.comment}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-auc-blue-500"
-                >
-                  <option value="Fall">Fall</option>
-                  <option value="Spring">Spring</option>
-                  <option value="Summer">Summer</option>
-                </select>
+                  placeholder="Share your experience with this class/professor. What did you like? What could be improved?"
+                  rows="6"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-auc-blue-500 ${
+                    errors.comment ? 'border-red-500' : 'border-slate-300'
+                  }`}
+                />
+                <div className="flex justify-between items-center mt-1 text-xs text-slate-500">
+                  {errors.comment && <p className="text-red-600">{errors.comment}</p>}
+                  <span>{formData.comment.length} / 2000 characters</span>
+                </div>
               </div>
-              <Input
-                type="number"
-                name="year"
-                label="Year"
-                value={formData.year}
-                onChange={handleInputChange}
-                min="2020"
-                max={new Date().getFullYear()}
-              />
-            </div>
 
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Review <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                name="comment"
-                value={formData.comment}
-                onChange={handleInputChange}
-                placeholder="Share your experience... (minimum 50 characters)"
-                rows="6"
-                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-auc-blue-500 ${
-                  errors.comment ? 'border-red-500' : 'border-slate-300'
-                }`}
-              />
-              <div className="flex justify-between items-center mt-1">
-                {errors.comment && <p className="text-sm text-red-600">{errors.comment}</p>}
-                <p className="text-sm text-slate-500 ml-auto">
-                  {formData.comment.length} / 50 characters
-                </p>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <label className="flex items-center">
+              <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   name="anonymous"
@@ -330,30 +450,46 @@ const SubmitReviewPage = () => {
                   onChange={handleInputChange}
                   className="w-4 h-4 rounded border-slate-300 text-auc-blue-600 focus:ring-auc-blue-500"
                 />
-                <span className="ml-2 text-sm text-slate-700">Submit anonymously</span>
-              </label>
-            </div>
+                <span className="text-sm text-slate-700">Post anonymously (recommended)</span>
+              </div>
 
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              disabled={isSubmitting}
-              className="w-full flex items-center justify-center space-x-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                  <span>Submitting...</span>
-                </>
-              ) : (
-                <>
-                  <FaPaperPlane />
-                  <span>Submit Review</span>
-                </>
-              )}
-            </Button>
-          </form>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-xs text-slate-600 space-y-1">
+                <p className="font-semibold text-slate-700">Review Guidelines</p>
+                <p>Be honest and constructive in your feedback.</p>
+                <p>Focus on the academic aspects of your experience.</p>
+                <p>Avoid personal attacks or inappropriate language.</p>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate(`/${type}/${id}`)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  disabled={isSubmitting}
+                  className="flex items-center space-x-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FaPaperPlane />
+                      <span>Submit Review</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </div>

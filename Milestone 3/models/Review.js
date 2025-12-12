@@ -79,12 +79,16 @@ const reviewSchema = new mongoose.Schema(
     comment: {
       type: String,
       required: [true, 'Comment is required'],
-      minlength: [50, 'Comment must be at least 50 characters'],
+      minlength: [1, 'Comment must be at least 1 character'],
       maxlength: [2000, 'Comment cannot exceed 2000 characters'],
     },
     // Metadata
     semester: {
       type: String,
+    },
+    courseTaken: {
+      type: String, // course code or name selected by the user for professor reviews
+      trim: true,
     },
     anonymous: {
       type: Boolean,

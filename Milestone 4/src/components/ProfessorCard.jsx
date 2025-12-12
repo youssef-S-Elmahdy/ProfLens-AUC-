@@ -4,6 +4,11 @@ import { FaChalkboardTeacher, FaComments } from 'react-icons/fa';
 import { StarRatingDisplay } from './StarRating';
 
 const ProfessorCard = ({ professor }) => {
+  const reviewCount =
+    (professor.reviews && professor.reviews.length) ||
+    professor.totalReviews ||
+    0;
+
   return (
     <Link
       to={`/professor/${professor._id || professor.id}`}
@@ -31,7 +36,7 @@ const ProfessorCard = ({ professor }) => {
           <StarRatingDisplay rating={professor.overallRating} size="md" />
           <div className="flex items-center text-slate-500 text-base">
             <FaComments className="mr-2" />
-            <span>{professor.totalReviews} reviews</span>
+            <span>{reviewCount} reviews</span>
           </div>
         </div>
 

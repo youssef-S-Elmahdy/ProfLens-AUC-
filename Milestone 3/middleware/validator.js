@@ -59,8 +59,54 @@ exports.reviewValidation = [
     .withMessage('Overall rating must be between 1 and 5'),
   body('comment')
     .trim()
-    .isLength({ min: 50, max: 2000 })
-    .withMessage('Comment must be between 50 and 2000 characters'),
+    .isLength({ min: 1, max: 2000 })
+    .withMessage('Comment must be between 1 and 2000 characters'),
+  // Professor-specific ratings
+  body('clarity')
+    .if(body('type').equals('professor'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Clarity rating must be between 1 and 5'),
+  body('helpfulness')
+    .if(body('type').equals('professor'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Helpfulness rating must be between 1 and 5'),
+  body('engagement')
+    .if(body('type').equals('professor'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Engagement rating must be between 1 and 5'),
+  body('grading')
+    .if(body('type').equals('professor'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Grading rating must be between 1 and 5'),
+  body('workload')
+    .if(body('type').equals('professor'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Workload rating must be between 1 and 5'),
+  body('communication')
+    .if(body('type').equals('professor'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Communication rating must be between 1 and 5'),
+  body('courseTaken')
+    .optional()
+    .isString()
+    .withMessage('Course taken must be a string'),
+  // Course-specific ratings
+  body('difficulty')
+    .if(body('type').equals('course'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Difficulty rating must be between 1 and 5'),
+  body('workload')
+    .if(body('type').equals('course'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Workload rating must be between 1 and 5'),
+  body('usefulness')
+    .if(body('type').equals('course'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Usefulness rating must be between 1 and 5'),
+  body('contentQuality')
+    .if(body('type').equals('course'))
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Content quality rating must be between 1 and 5'),
 ];
 
 // Professor validation
